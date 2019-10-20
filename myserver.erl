@@ -1,5 +1,5 @@
 -module(myserver).
-
+-compile(export_all).
 -record(cat,{name,color=green,description}).
 
 start_link()->spawn_link(fun init/0).
@@ -7,35 +7,29 @@ start_link()->spawn_link(fun init/0).
 init()->
     loop([]).
 
-order_cat(Pid,Name,Color,Description)->
-    Ref=erlang:monitor(process,Pid),
-    Pid ! {self(),Ref,{order,Name,Color,Description}},
-    receive 
-        {Ref,Cat}->
-            erlang:demonitor(Ref,[flush]),
-            Cat;
-        {'DOWN',Ref,process,Pid,Reason}->
-            Pid ! error(Reason)
-    after 5000 ->
-        erlang:error(timeout)
-    end.
 
-
-close_shop(Pid)->
+call(Pid,Msg)->
     Ref=erlang:monitor(process,Pid),
-    Pid ! {self(),Ref,terminate},
+    Pid ! {Ref,Msg},
     receive 
-        {Ref,ok}->erlang:demonitor(Ref,[flush]),
-                  ok;
+        {Ref,Reply}->erlang:demonitor(Pid,[flush]),
+                     Reply;
         {'DOWN',Ref,process,Pid,Reason}->
             erlang:error(Reason)
     after 5000 ->
         erlang:error(timeout)
-    end.
+end.
+       
+order_cat(Pid,Name,Color,Description)->
+    myserver:call(Pid,{order,{Name,Color,Description}}).
 
+
+close_shop(Pid)->
+    myserver:call(Pid,terminate)
+    
 return_cat(Pid,Cat=#cat{})->
-    Pid ! {return,Cat},
-    ok.
+   myserver:call(Pid,Cat),
+   ok.
 
 loop(Cats)->
     receive 
@@ -51,6 +45,7 @@ loop(Cats)->
                 Pid !{Ref,ok},
                 terminate(Cats);
     {return,Cat=#cat{}}->
+        
         loop([Cat|Cats]);
     Unknown -> io:format("unnkown message"),
                loop(Cats)
