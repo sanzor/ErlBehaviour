@@ -1,5 +1,5 @@
 -module(myserver).
--compile(export_all).
+-compile([export_all,debug_info]).
 -record(cat,{name,color=green,description}).
 
 start_link()->spawn_link(fun init/0).
@@ -19,13 +19,22 @@ call(Pid,Msg)->
     after 5000 ->
         erlang:error(timeout)
 end.
-       
+
+cast(Pid,Msg)->
+    Pid ! {async,Msg},
+    ok.
+
+loop(Module,State)->
+    receive
+        {async,MSG}->loop(Module,Module:handle_cast(Msg,State));
+        {sync,Pid,Ref,Msg}->loop(Module,Module_call(Pid,Ref,Msg))
+end.
 order_cat(Pid,Name,Color,Description)->
     myserver:call(Pid,{order,{Name,Color,Description}}).
 
 
 close_shop(Pid)->
-    myserver:call(Pid,terminate)
+    myserver:call(Pid,terminate).
     
 return_cat(Pid,Cat=#cat{})->
    myserver:call(Pid,Cat),
