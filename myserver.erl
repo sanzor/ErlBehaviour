@@ -1,67 +1,49 @@
--module(myserver).
--compile([export_all,debug_info]).
--record(cat,{name,color=green,description}).
-
-start_link()->spawn_link(fun init/0).
-
-init()->
-    loop([]).
-
-
-call(Pid,Msg)->
-    Ref=erlang:monitor(process,Pid),
-    Pid ! {Ref,Msg},
-    receive 
-        {Ref,Reply}->erlang:demonitor(Pid,[flush]),
-                     Reply;
-        {'DOWN',Ref,process,Pid,Reason}->
-            erlang:error(Reason)
-    after 5000 ->
-        erlang:error(timeout)
-end.
-
-cast(Pid,Msg)->
-    Pid ! {async,Msg},
-    ok.
-
-loop(Module,State)->
-    receive
-        {async,MSG}->loop(Module,Module:handle_cast(Msg,State));
-        {sync,Pid,Ref,Msg}->loop(Module,Module_call(Pid,Ref,Msg))
-end.
-order_cat(Pid,Name,Color,Description)->
-    myserver:call(Pid,{order,{Name,Color,Description}}).
+-module(kitty_server2).
+ 
+-export([start_link/0, order_cat/4, return_cat/2, close_shop/1]).
+-export([init/1, handle_call/3, handle_cast/2]).
+ 
+-record(cat, {name, color=green, description}).
+ 
+%%% Client API
+start_link() -> my_server:start_link(?MODULE, []).
+ 
+%% Synchronous call
+order_cat(Pid, Name, Color, Description) ->
+my_server:call(Pid, {order, Name, Color, Description}).
+ 
+%% This call is asynchronous
+return_cat(Pid, Cat = #cat{}) ->
+my_server:cast(Pid, {return, Cat}).
+ 
+%% Synchronous call
+close_shop(Pid) ->
+my_server:call(Pid, terminate).
 
 
-close_shop(Pid)->
-    myserver:call(Pid,terminate).
-    
-return_cat(Pid,Cat=#cat{})->
-   myserver:call(Pid,Cat),
-   ok.
+%%% Server functions
+init([]) -> []. %% no treatment of info here!
+ 
+handle_call({order, Name, Color, Description}, From, Cats) ->
+if Cats =:= [] ->
+my_server:reply(From, make_cat(Name, Color, Description)),
+Cats;
+Cats =/= [] ->
+my_server:reply(From, hd(Cats)),
+tl(Cats)
+end;
+ 
+handle_call(terminate, From, Cats) ->
+my_server:reply(From, ok),
+terminate(Cats).
+ 
+handle_cast({return, Cat = #cat{}}, Cats) ->
+[Cat|Cats].
 
-loop(Cats)->
-    receive 
-    {Pid,Ref,{order,Name,Color,Description}}->
-        if Cats =:= [] ->
-              Pid !{Ref,make_cat(Name,Color,Description)},
-              loop(Cats);
-           Cats =/=[] ->
-              Pid ! {Ref,hd(Cats)},
-              loop(tl(Cats))
-        end;
-    {Pid,Ref,terminate}->
-                Pid !{Ref,ok},
-                terminate(Cats);
-    {return,Cat=#cat{}}->
-        
-        loop([Cat|Cats]);
-    Unknown -> io:format("unnkown message"),
-               loop(Cats)
-    end.
-make_cat(Name,Color,Description)->#cat{name=Name,color=Color,description=Description}.
-
-terminate(Cats)->
-    [io:format("~p was set free",C#cat.name)|| C <-Cats ].
-    
-
+%%% Private functions
+make_cat(Name, Col, Desc) ->
+#cat{name=Name, color=Col, description=Desc}.
+ 
+terminate(Cats) ->
+[io:format("~p was set free.~n",[C#cat.name]) || C <- Cats],
+exit(normal).
