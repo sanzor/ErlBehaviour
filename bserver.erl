@@ -37,13 +37,13 @@ make_emp(Name,Age,Wage)->
 reply({Pid,Ref},Msg)->
     Pid ! {Ref,Msg}.
 
-terminate(Name,C#{emps=Emps})->
+terminate(Name,Emps)->
     NewEmps=case orddict:find(Name,Emps) of 
             {ok,Emp}->
                 orddict:erase(Name,Emps);
             _ -> Emps
             end,
-    C#{emps=NewEmps}.
+    NewEmps.
     
 
 
@@ -53,9 +53,13 @@ handle_call({hire,{Name,Age,Wage}},{Pid,Ref},C=#company{emps=Emps})->
     bserver:reply({Pid,Ref},{hired,Name}),
     C#company{emps=NewEmps};
 handle_call({terminate,Name,From,C)->
-    bserver:terminate(Name,C);
+    NewEmps=bserver:terminate(Name,C#company.emps),
+    C#company{emps=NewEmps};
 handle_call({relocate,{Pid,Ref},C=#company{emps=Emps}})->
-    
+    Refs=orddict:fetch_keys(Emps),
+    Dict=orddict:foldl(terminate,Emps,Refs),
+    C#company{emps=Dict}.
+
 
 
 
