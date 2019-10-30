@@ -1,1 +1,0 @@
--import(bserver,[emp]).
