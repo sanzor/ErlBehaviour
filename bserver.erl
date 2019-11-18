@@ -43,27 +43,31 @@ make_emp(Name,Age,Wage)->
 reply({Pid,Ref},Msg)->
     Pid ! {Ref,Msg}.
 
-terminate(Name,Emps)->
-    NewEmps=case orddict:find(Name,Emps) of 
+terminate(Ref,Emps)->
+    case orddict:find(Ref,Emps) of 
             {ok,Emp}->
-                orddict:erase(Name,Emps);
-            _ -> Emps
-            end,
-    NewEmps.
+                {orddict:erase(Ref,Emps),Emp};
+            _ -> {Emps,not_found}
+    end.
     
-
+    
+getMessage(Emp)when Emp==not_found->"Could not find Employee";
+getMessage(Emp)->{kicked,MaybeEmp}.
 
 handle_call({hire,{Name,Age,Wage}},{Pid,Ref},C=#company{emps=Emps})->
     Emp=bserver:make_emp(Name,Age,Wage),
     NewEmps=orddict:store(Ref,Emp,Emps),
     bserver:reply({Pid,Ref},{hired,Name}),
     C#company{emps=NewEmps};
-handle_call(terminate,{Name,From},C)->
-    NewEmps=bserver:terminate(Name,C#company.emps),
-    C#company{emps=NewEmps};
+handle_call(terminate,{Pid,Ref},C)->
+    {Emps,MaybeEmp}=bserver:terminate(Ref,C#company.emps),
+    Result=getMessage(MaybeEmp)
+                   ,
+    bserver:reply({Pid,Ref},Result),
+    C#company{emps=Emps};
 handle_call(relocate,{Pid,Ref},C=#company{emps=Emps})->
     Refs=orddict:fetch_keys(Emps),
-    Dict=orddict:foldl(terminate,Emps,Refs),
+    Dict=orddict:foldl(fun(Ref,Acc)->bserver:terminate(Ref,Acc),Emps,Refs),
     C#company{emps=Dict}.
 
 handle_cast({promote,Increase},C)->
