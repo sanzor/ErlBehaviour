@@ -1,24 +1,27 @@
 -module(bclient).
 -import(bserver,[makeRecord/3]).
--export([create/4,getall/1]).
+-export([hire/4,getall/1,send/3]).
 
-
-
-create(Pid,Name,Age,Description)->
-    Ref=erlang:monitor(process,Pid),
-    Pid ! {sync,self(),Ref,{hire,{Name,Age,Description}}},
-    receive
-        {Ref,Msg}->Msg;
-        {'DOWN',Ref,process,Pid,Reason}->did_not_hire
+send(Pid,Mode,Msg)->
+    if  Mode =:= sync ->
+            Ref=erlang:monitor(process,Pid),
+            Pid ! {Mode,Pid,Ref,Msg},
+            receive 
+                {Ref,Msg}->Msg;
+                {'DOWN',Ref,process,Pid,Reason}->{unsuccessful,Reason}
+            end;
+        Mode =/= sync ->
+            Pid ! {async,Msg}
     end.
 
+hire(Pid,Name,Age,Wage)->
+    bclient:send(Pid,sync,{hire,{Name,Age,Wage}}).
+
+
 getall(Pid)->
-    Ref=erlang:monitor(process,Pid),
-    Pid ! {sync,self(),Ref,get_all},
-    receive
-        {{Pid,Ref},Emps}->Emps;
-        Err ->"Could not fetch emps :"++Err
-    end. 
+    bclient:send(Pid,sync,get_all).
+
+
 
 
     

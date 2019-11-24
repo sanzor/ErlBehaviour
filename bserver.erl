@@ -37,6 +37,8 @@ loop(Module,C)->
         {async,Msg}->loop(Module,bserver:handle_cast(Msg,C));
         {sync,Pid,Ref,Msg}->loop(Module,bserver:handle_call(Msg,{Pid,Ref},C))
     end.
+
+
 make_emp(Name,Age,Wage)->
     #emp{
     name=Name,
