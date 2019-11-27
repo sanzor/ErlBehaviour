@@ -35,7 +35,8 @@ init(Module,InitialState)->
 loop(Module,C)->
     receive 
         {async,Msg}->loop(Module,bserver:handle_cast(Msg,C));
-        {sync,Pid,Ref,Msg}->loop(Module,bserver:handle_call(Msg,{Pid,Ref},C))
+        {sync,Pid,Ref,Msg}->loop(Module,bserver:handle_call(Msg,{Pid,Ref},C));
+        Msg ->exit(Msg)
     end.
 
 
