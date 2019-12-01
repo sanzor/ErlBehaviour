@@ -1,6 +1,17 @@
 -module(bclient).
 -import(bserver,[makeRecord/3]).
--export([hire/4,getall/1,send/3]).
+-export([hire/4,getall/1,send/3,initLoop/1,loopProc/1]).
+
+initLoop(Server)->
+    spawn(?MODULE,loopProc,[Server]).
+loopProc(Server)->
+    receive
+        {Pid,Mode,Msg}->
+            send(Server,Mode,Msg),
+            loopProc(Server);
+        stop->exit(normal);
+        _ -> io:format("Could not process message")
+     end.
 
 send(Pid,Mode,Msg)->
     if  Mode =:= sync ->
